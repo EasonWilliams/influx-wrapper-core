@@ -3,6 +3,7 @@ package cn.huang.core.service.impl;
 import cn.huang.core.config.InfluxWrapper;
 import cn.huang.core.result.PageResult;
 import cn.huang.core.service.IService;
+import cn.huang.core.util.JsonUtils;
 import cn.huang.core.wrapper.delete.LambdaDeleteWrapper;
 import cn.huang.core.wrapper.query.LambdaQueryWrapper;
 import com.influxdb.client.WriteApiBlocking;
@@ -36,7 +37,7 @@ public abstract class ServiceImpl<T> implements IService<T> {
         lambdaQueryWrapper.FLUX.insert(0, String.format("from(bucket: \"%s\")", influxWrapper.getBucket()));
         List<T> tables = influxWrapper.getClient().getQueryApi().query(lambdaQueryWrapper.FLUX.toString(), lambdaQueryWrapper.getEntityClass());
         if (influxWrapper.getLogEnabled())
-            log.info(String.format("【influx wrapper】\n----QueryFlux：\n%s\n----QueryTables：\n%s", lambdaQueryWrapper.FLUX.toString(), tables));
+            log.info(String.format("【influx wrapper】\n----QueryFlux：\n%s\n----QueryTables：\n%s", lambdaQueryWrapper.FLUX.toString(), JsonUtils.arrToJsonStr(tables)));
         return tables;
     }
 
@@ -76,7 +77,7 @@ public abstract class ServiceImpl<T> implements IService<T> {
         WriteApiBlocking blocking = influxWrapper.getClient().getWriteApiBlocking();
         blocking.writeMeasurement(influxWrapper.getBucket(), influxWrapper.getOrg(), WritePrecision.NS, entity);
         if (influxWrapper.getLogEnabled())
-            log.info(String.format("【influx wrapper】\n----Insert：\n%s", entity));
+            log.info(String.format("【influx wrapper】\n----Insert：\n%s", JsonUtils.objToJsonStr(entity)));
     }
 
     @Override
@@ -84,7 +85,7 @@ public abstract class ServiceImpl<T> implements IService<T> {
         WriteApiBlocking blocking = influxWrapper.getClient().getWriteApiBlocking();
         blocking.writeMeasurements(influxWrapper.getBucket(), influxWrapper.getOrg(), WritePrecision.NS, entityList);
         if (influxWrapper.getLogEnabled())
-            log.info(String.format("【influx wrapper】\n----InsertBatch：\n%s", entityList));
+            log.info(String.format("【influx wrapper】\n----InsertBatch：\n%s", JsonUtils.arrToJsonStr(entityList)));
     }
 
     @Override
