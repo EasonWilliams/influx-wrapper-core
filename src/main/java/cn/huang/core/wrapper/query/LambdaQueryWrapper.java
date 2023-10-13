@@ -4,9 +4,9 @@ import cn.huang.core.wrapper.AbstractWrapper;
 import com.influxdb.annotations.Column;
 import com.influxdb.annotations.Measurement;
 
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * @author huangl
@@ -15,17 +15,16 @@ import java.util.Optional;
  */
 public class LambdaQueryWrapper<T> extends AbstractWrapper<T> implements LambdaQuery<T> {
     private boolean isRanged = false;
-    private String MEASUREMENT;
+    private final String MEASUREMENT;
 
     public LambdaQueryWrapper(Class<T> entityClass) {
         super(entityClass);
-        Optional.ofNullable(this.getEntityClass().getAnnotation(Measurement.class).name())
-                .ifPresentOrElse(
-                        measurement -> MEASUREMENT = measurement,
-                        () -> {
-                            throw new RuntimeException("[influxdb2] ERROR : @Measurement must be annotated on entity class");
-                        }
-                );
+        String measurement = this.getEntityClass().getAnnotation(Measurement.class).name();
+        if (measurement != null && !measurement.equals("")) {
+            this.MEASUREMENT = measurement;
+        } else {
+            throw new RuntimeException("[influxdb2] ERROR : @Measurement must be annotated on entity class");
+        }
     }
 
     @Override
@@ -103,8 +102,8 @@ public class LambdaQueryWrapper<T> extends AbstractWrapper<T> implements LambdaQ
     public LambdaQueryWrapper<T> pivot() {
         isRanged();
         FLUX.append("\n|> pivot(rowKey: [\"_time\"");
-        var fields = this.getEntityClass().getFields();
-        for (var field : fields) {
+        Field[] fields = this.getEntityClass().getFields();
+        for (Field field : fields) {
             if (field.isAnnotationPresent(Column.class) && field.getAnnotation(Column.class).tag())
                 FLUX.append(String.format(",\"%s\"", field.getAnnotation(Column.class).name() == null ? field.getName() : field.getAnnotation(Column.class).name()));
         }
@@ -122,7 +121,7 @@ public class LambdaQueryWrapper<T> extends AbstractWrapper<T> implements LambdaQ
     @Override
     public LambdaQueryWrapper<T> group(List<String> keys) {
         FLUX.append("\n|> group(columns: [");
-        for (var i = 0; i < keys.size(); i++) {
+        for (int i = 0; i < keys.size(); i++) {
             FLUX.append(String.format("\"%s\"", keys.get(i)));
             if (i != keys.size() - 1)
                 FLUX.append(",");
@@ -146,7 +145,7 @@ public class LambdaQueryWrapper<T> extends AbstractWrapper<T> implements LambdaQ
     @Override
     public LambdaQueryWrapper<T> sort(List<String> keys, Boolean desc) {
         FLUX.append("\n|> sort(columns: [");
-        for (var i = 0; i < keys.size(); i++) {
+        for (int i = 0; i < keys.size(); i++) {
             FLUX.append(String.format("\"%s\"", keys.get(i)));
             if (i != keys.size() - 1)
                 FLUX.append(",");
@@ -173,7 +172,7 @@ public class LambdaQueryWrapper<T> extends AbstractWrapper<T> implements LambdaQ
     }
 
     public LambdaQueryWrapper<T> copy() {
-        var wrapper = new LambdaQueryWrapper<>(this.getEntityClass());
+        LambdaQueryWrapper<T> wrapper = new LambdaQueryWrapper<>(this.getEntityClass());
         wrapper.FLUX = new StringBuffer(this.FLUX);
         return wrapper;
     }
