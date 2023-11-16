@@ -35,9 +35,11 @@ public abstract class ServiceImpl<T> implements IService<T> {
     @Override
     public List<T> queryList(LambdaQueryWrapper<T> lambdaQueryWrapper) {
         lambdaQueryWrapper.FLUX.insert(0, String.format("from(bucket: \"%s\")", influxWrapper.getBucket()));
+        if (influxWrapper.getLogEnabled())
+            log.info(String.format("【influx wrapper】\n----QueryFlux：\n%s", lambdaQueryWrapper.FLUX.toString()));
         List<T> tables = influxWrapper.getClient().getQueryApi().query(lambdaQueryWrapper.FLUX.toString(), lambdaQueryWrapper.getEntityClass());
         if (influxWrapper.getLogEnabled())
-            log.info(String.format("【influx wrapper】\n----QueryFlux：\n%s\n----QueryTables：\n%s", lambdaQueryWrapper.FLUX.toString(), JsonUtils.arrToJsonStr(tables)));
+            log.info(String.format("【influx wrapper】\n----QueryTables：\n%s", JsonUtils.arrToJsonStr(tables)));
         return tables;
     }
 
@@ -58,6 +60,8 @@ public abstract class ServiceImpl<T> implements IService<T> {
     public Long queryCount(LambdaQueryWrapper<T> lambdaQueryWrapper) {
         lambdaQueryWrapper.FLUX.insert(0, String.format("from(bucket: \"%s\")", influxWrapper.getBucket()));
         lambdaQueryWrapper.group(Collections.singletonList("_measurement")).count();
+        if (influxWrapper.getLogEnabled())
+            log.info(String.format("【influx wrapper】\n----QueryFlux：\n%s", lambdaQueryWrapper.FLUX.toString()));
         List<FluxTable> tables = influxWrapper.getClient().getQueryApi().query(lambdaQueryWrapper.FLUX.toString());
         AtomicLong count = new AtomicLong();
         tables.forEach(table -> table.getRecords().forEach(record -> {
@@ -68,35 +72,35 @@ public abstract class ServiceImpl<T> implements IService<T> {
             });
         }));
         if (influxWrapper.getLogEnabled())
-            log.info(String.format("【influx wrapper】\n----QueryFlux：\n%s\n----QueryCounts：%s", lambdaQueryWrapper.FLUX.toString(), count.get()));
+            log.info(String.format("【influx wrapper】\n----QueryCounts：%s", count.get()));
         return count.get();
     }
 
     @Override
     public void insert(T entity) {
         WriteApiBlocking blocking = influxWrapper.getClient().getWriteApiBlocking();
-        blocking.writeMeasurement(influxWrapper.getBucket(), influxWrapper.getOrg(), WritePrecision.NS, entity);
         if (influxWrapper.getLogEnabled())
             log.info(String.format("【influx wrapper】\n----Insert：\n%s", JsonUtils.objToJsonStr(entity)));
+        blocking.writeMeasurement(influxWrapper.getBucket(), influxWrapper.getOrg(), WritePrecision.NS, entity);
     }
 
     @Override
     public void insertBatch(List<T> entityList) {
         WriteApiBlocking blocking = influxWrapper.getClient().getWriteApiBlocking();
-        blocking.writeMeasurements(influxWrapper.getBucket(), influxWrapper.getOrg(), WritePrecision.NS, entityList);
         if (influxWrapper.getLogEnabled())
             log.info(String.format("【influx wrapper】\n----InsertBatch：\n%s", JsonUtils.arrToJsonStr(entityList)));
+        blocking.writeMeasurements(influxWrapper.getBucket(), influxWrapper.getOrg(), WritePrecision.NS, entityList);
     }
 
     @Override
     public void delete(LambdaDeleteWrapper<T> lambdaDeleteWrapper) {
+        if (influxWrapper.getLogEnabled())
+            log.info(String.format("【influx wrapper】\n----Delete：\nstart：%s\nend：%s\nflux：%s",
+                    lambdaDeleteWrapper.getStart(), lambdaDeleteWrapper.getEnd(), lambdaDeleteWrapper.FLUX.toString()));
         influxWrapper.getClient().getDeleteApi().delete(lambdaDeleteWrapper.getStart(),
                 lambdaDeleteWrapper.getEnd(),
                 lambdaDeleteWrapper.FLUX.toString(),
                 influxWrapper.getBucket(),
                 influxWrapper.getOrg());
-        if (influxWrapper.getLogEnabled())
-            log.info(String.format("【influx wrapper】\n----Delete：\nstart：%s\nend：%s\nflux：%s",
-                    lambdaDeleteWrapper.getStart(), lambdaDeleteWrapper.getEnd(), lambdaDeleteWrapper.FLUX.toString()));
     }
 }
